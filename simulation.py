@@ -2,7 +2,7 @@ import random
 import math
 
 TOTAL_ENERGY = 13.6
-N_COLLISIONS = 10000
+N_COLLISIONS = 10
 
 def choose_final_state():
     r = random.random()
@@ -18,6 +18,7 @@ def choose_final_state():
         return ["muon", "antimuon", "proton", "proton"]
     else:
         return ["neutron", "antineutron", "proton", "proton"]
+    
 for i in range(N_COLLISIONS):
     particles = choose_final_state()
     n = len(particles)
@@ -27,24 +28,31 @@ for i in range(N_COLLISIONS):
     pz_list = []
     total_px = 0.0
     total_pz = 0.0
+
     for j in range(n - 1):
         E = random.uniform(0.0, TOTAL_ENERGY)
         theta = random.uniform(0, 2 * math.pi)
+
         px = E * math.cos(theta)
         pz = E * math.sin(theta)
+
         energies.append(E)
         angles.append(theta)
         px_list.append(px)
         pz_list.append(pz)
+
         total_px += px
         total_pz += pz
+
     px_last = -total_px
     pz_last = -total_pz
     E_last = math.sqrt(px_last**2 + pz_last**2)
     energies.append(E_last)
     angles.append(math.atan2(pz_last, px_last))
+
     px_list.append(px_last)
     pz_list.append(pz_last)
+
     print(f"\nCollision {i + 1}")
     print("Final state is:", " + ".join(particles))
     for particle, E, theta, px, pz in zip(
