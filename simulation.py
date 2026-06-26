@@ -1,12 +1,19 @@
-import random
 import math
+import random
 
-TOTAL_ENERGY = 13.6
-N_COLLISIONS = 10
+TOTAL_ENERGY = 13.6  # TeV
+TARGET_LOGGED_EVENTS = 5
+OUTPUT_FILE = "standardized_events.txt"
 
-# Each final state returns (particles, state_label). "Higgs" is only a STATE
-# label for the photon/photon/proton/proton final state -- it is not a particle,
-# so it carries no energy or momentum of its own.
+# Cuts
+MIN_ENERGY = 0.02  # 20 GeV converted to TeV
+PI = math.pi
+ANGLE_RANGES = [
+    (1 / 18 * PI, 17 / 18 * PI),  # 10 to 170 degrees
+    (19 / 18 * PI, 35 / 18 * PI),  # 190 to 350 degrees
+]
+
+
 def choose_final_state():
     r = random.random()
     if r < 0.25:
@@ -14,7 +21,7 @@ def choose_final_state():
     elif r < 0.26:
         return ["photon", "photon", "proton", "proton"], "Higgs"
     elif r < 0.30:
-        return ["photon", "photon", "proton", "proton"], None
+        return ["photon", "photon", "proton", "proton"], "No Higgs"
     elif r < 0.50:
         return ["positron", "electron", "proton", "proton"], None
     elif r < 0.68:
@@ -22,56 +29,92 @@ def choose_final_state():
     else:
         return ["neutron", "antineutron", "proton", "proton"], None
 
-for i in range(N_COLLISIONS):
-    particles, state = choose_final_state()
-    n = len(particles)
-    energies = []
-    angles = []
-    px_list = []
-    pz_list = []
-    total_px = 0.0
-    total_pz = 0.0
 
-    REMAINING_ENERGY = TOTAL_ENERGY
-    for j in range(n - 1):
-        E = random.uniform(0.0, REMAINING_ENERGY) # Fix this since 
-        #conservation of energy is not conserved. After every
-        #random, you have to minus the first randomed energy
-        #then continue random the remaining particles' energy
-        REMAINING_ENERGY -= E
-        theta = random.uniform(0, 2 * math.pi)
+def is_valid_angle(theta):
+    # Normalize to [0, 2*pi) for validation against the cut windows
+    t = theta % (2 * PI)
+    for low, high in ANGLE_RANGES:
+        if low <= t <= high:
+            return True
+    return False
 
-        #z la truc ngang, x la truc doc
-        pz = E * math.cos(theta)
-        px = E * math.sin(theta)
 
-        energies.append(E)
-        angles.append(theta)
-        px_list.append(px)
-        pz_list.append(pz)
+logged_count = 0
+total_simulated_collisions = 0
 
-        total_px += px
-        total_pz += pz
+with open(OUTPUT_FILE, "w") as f:
+    while logged_count < TARGET_LOGGED_EVENTS:
+        total_simulated_collisions += 1
+        particles, state = choose_final_state()
 
-    px_last = -total_px
-    pz_last = -total_pz
-    # Last particle gets the leftover energy so sum(energies) == TOTAL_ENERGY.
-    E_last = REMAINING_ENERGY
-    energies.append(E_last)
-    angles.append(math.atan2(px_last, pz_last))
+        # Phase 1 Filter: We only care about logging the "No Higgs" 4-body state
+        if state != "No Higgs":
+            continue
 
-    px_list.append(px_last)
-    pz_list.append(pz_last)
+        n = len(particles)
+        energies = []
+        angles = []
+        px_list = []
+        pz_list = []
+        total_px = 0.0
+        total_pz = 0.0
 
-    print(f"\nCOLLISION {i + 1}")
-    if state is not None:
-        print(f"State: {state}")
-    print("Final state is:", " + ".join(particles))
-    for particle, E, theta, px, pz in zip(
-        particles, energies, angles, px_list, pz_list
-    ):
-        print(f"Particle: {particle}")
-        print(f"___Energy (TeV): {E}")
-        print(f"___Angle (rad): {theta}")
-        print(f"___p_x (TeV): {px}")
-        print(f"___p_z (TeV): {pz}")
+        REMAINING_ENERGY = TOTAL_ENERGY
+        event_is_valid = True
+
+        # Kinematics for the first n-1 particles
+        for j in range(n - 1):
+            E = random.uniform(0.0, REMAINING_ENERGY)
+            REMAINING_ENERGY -= E
+            theta = random.uniform(0, 2 * PI)
+
+            # Strict cut verification per particle
+            if E < MIN_ENERGY or not is_valid_angle(theta):
+                event_is_valid = False
+                break
+
+            pz = E * math.cos(theta)
+            px = E * math.sin(theta)
+
+            energies.append(E)
+            angles.append(theta)
+            px_list.append(px)
+            pz_list.append(pz)
+
+            total_px += px
+            total_pz += pz
+
+        if not event_is_valid:
+            continue  # Discard if internal particle fails cuts
+
+        # Kinematics for the last particle
+        E_last = REMAINING_ENERGY
+        px_last = -total_px
+        pz_last = -total_pz
+        theta_last = math.atan2(px_last, pz_last)
+
+        # Phase 2 Filter: Check cuts for the final balancing particle
+        if E_last < MIN_ENERGY or not is_valid_angle(theta_last):
+            continue
+
+        energies.append(E_last)
+        angles.append(theta_last)
+        px_list.append(px_last)
+        pz_list.append(pz_last)
+
+        # If it passes all criteria, officially log it
+        logged_count += 1
+
+        f.write(f"EVENT_ID: {logged_count}\n")
+        f.write(f"State: {state}\n")
+        f.write(f"N_Particles: {n}\n")
+        f.write(
+            f"{'Particle':<12} {'Energy(TeV)':<15} {'Angle(rad)':<15} {'p_x(TeV)':<15} {'p_z(TeV)':<15}\n"
+        )
+
+        for particle, E, theta, px, pz in zip(
+            particles, energies, angles, px_list, pz_list
+        ):
+            f.write(
+                f"{particle:<12} {E:<15.6f} {theta % (2*PI):<15.6f} {px:<15.6f} {pz:<15.6f}\n"
+            )
