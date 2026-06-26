@@ -3,7 +3,7 @@ import random
 
 TOTAL_ENERGY = 13.6  # TeV
 TARGET_LOGGED_EVENTS = 5
-OUTPUT_FILE = "standardized_events.txt"
+OUTPUT_FILE = "no_higgs_events.txt"
 
 # Cuts
 MIN_ENERGY = 0.02  # 20 GeV converted to TeV
