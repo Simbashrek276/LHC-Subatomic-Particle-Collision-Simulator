@@ -6,7 +6,7 @@ N_COLLISIONS = 10
 
 # Each final state returns (particles, state_label). "Higgs" is only a STATE
 # label for the photon/photon/proton/proton final state -- it is not a particle,
-# so it carries no energy or momentum of its own.
+# so it carries no energy or momentum of its own
 def choose_final_state():
     r = random.random()
     if r < 0.25:
