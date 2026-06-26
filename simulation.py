@@ -1,6 +1,10 @@
 import math
 import random
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 TOTAL_ENERGY = 13.6  # TeV
 TARGET_LOGGED_EVENTS = 5
 OUTPUT_FILE = "no_higgs_events.txt"
@@ -44,6 +48,7 @@ def is_valid_angle(theta):
 
 logged_count = 0
 total_simulated_collisions = 0
+all_energies = []
 
 with open(OUTPUT_FILE, "w") as f:
     while logged_count < TARGET_LOGGED_EVENTS:
@@ -87,6 +92,7 @@ with open(OUTPUT_FILE, "w") as f:
         angles.append(theta_last)
         px_list.append(px_last)
         pz_list.append(pz_last)
+        all_energies.extend(energies)
 
         # Does the whole event pass the energy + angle cuts?
         passes_cuts = all(
@@ -122,3 +128,13 @@ with open(OUTPUT_FILE, "w") as f:
             f.write(f"___EVENT_ID: {logged_count}___\n")
             for line in body:
                 f.write(line)
+
+if all_energies:
+    plt.figure(figsize=(8, 5))
+    plt.hist(all_energies, bins=20, color="skyblue", edgecolor="black")
+    plt.xlabel("Energy (TeV)")
+    plt.ylabel("Number of Particles")
+    plt.title("Energy Distribution")
+    plt.tight_layout()
+    plt.savefig("energy_histogram.png")
+    print("Histogram saved to energy_histogram.png")
