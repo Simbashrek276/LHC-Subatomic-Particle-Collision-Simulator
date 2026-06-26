@@ -50,10 +50,6 @@ with open(OUTPUT_FILE, "w") as f:
         total_simulated_collisions += 1
         particles, state = choose_final_state()
 
-        # Phase 1 Filter: We only care about logging the "No Higgs" 4-body state
-        if state != "No Higgs":
-            continue
-
         n = len(particles)
         energies = []
         angles = []
@@ -63,18 +59,12 @@ with open(OUTPUT_FILE, "w") as f:
         total_pz = 0.0
 
         REMAINING_ENERGY = TOTAL_ENERGY
-        event_is_valid = True
 
         # Kinematics for the first n-1 particles
         for j in range(n - 1):
             E = random.uniform(0.0, REMAINING_ENERGY)
             REMAINING_ENERGY -= E
             theta = random.uniform(0, 2 * PI)
-
-            # Strict cut verification per particle
-            if E < MIN_ENERGY or not is_valid_angle(theta):
-                event_is_valid = False
-                break
 
             pz = E * math.cos(theta)
             px = E * math.sin(theta)
@@ -87,37 +77,48 @@ with open(OUTPUT_FILE, "w") as f:
             total_px += px
             total_pz += pz
 
-        if not event_is_valid:
-            continue  # Discard if internal particle fails cuts
-
         # Kinematics for the last particle
         E_last = REMAINING_ENERGY
         px_last = -total_px
         pz_last = -total_pz
         theta_last = math.atan2(px_last, pz_last)
 
-        # Phase 2 Filter: Check cuts for the final balancing particle
-        if E_last < MIN_ENERGY or not is_valid_angle(theta_last):
-            continue
-
         energies.append(E_last)
         angles.append(theta_last)
         px_list.append(px_last)
         pz_list.append(pz_last)
 
-        # If it passes all criteria, officially log it
-        logged_count += 1
-
-        f.write(f"EVENT_ID: {logged_count}\n")
-        f.write(f"State: {state}\n")
-        f.write(f"N_Particles: {n}\n")
-        f.write(
-            f"{'Particle':<12} {'Energy(TeV)':<15} {'Angle(rad)':<15} {'p_x(TeV)':<15} {'p_z(TeV)':<15}\n"
+        # Does the whole event pass the energy + angle cuts?
+        passes_cuts = all(
+            E >= MIN_ENERGY and is_valid_angle(theta)
+            for E, theta in zip(energies, angles)
         )
 
+        # Build the particle rows once (shared by console and file).
+        body = [
+            f"State: {state}\n",
+            f"N_Particles: {n}\n",
+            f"{'Particle':<12} {'Energy(TeV)':<15} {'Angle(rad)':<15} {'p_x(TeV)':<15} {'p_z(TeV)':<15}\n",
+        ]
         for particle, E, theta, px, pz in zip(
             particles, energies, angles, px_list, pz_list
         ):
-            f.write(
+            body.append(
                 f"{particle:<12} {E:<15.6f} {theta % (2*PI):<15.6f} {px:<15.6f} {pz:<15.6f}\n"
             )
+
+        # Print EVERY event/combination to the console, tagged with whether it
+        # passed the kinematic cuts.
+        cut_tag = "PASSED CUTS" if passes_cuts else "FAILED CUTS"
+        print(f"___COLLISION: {total_simulated_collisions}___ [{cut_tag}]")
+        for line in body:
+            print(line, end="")
+        print()
+
+        # Export ONLY the 2-photon/2-proton states (Higgs + No Higgs) that pass
+        # the cuts, up to the target number of logged events.
+        if state in ("Higgs", "No Higgs") and passes_cuts:
+            logged_count += 1
+            f.write(f"___EVENT_ID: {logged_count}___\n")
+            for line in body:
+                f.write(line)
