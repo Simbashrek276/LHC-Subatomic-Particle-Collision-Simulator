@@ -2,7 +2,6 @@ import math
 import random
 
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 TOTAL_ENERGY = 13.6  # TeV
@@ -92,7 +91,6 @@ with open(OUTPUT_FILE, "w") as f:
         angles.append(theta_last)
         px_list.append(px_last)
         pz_list.append(pz_last)
-        all_energies.extend(energies)
 
         # Does the whole event pass the energy + angle cuts?
         passes_cuts = all(
@@ -124,14 +122,16 @@ with open(OUTPUT_FILE, "w") as f:
         # Export ONLY the 2-photon/2-proton states (Higgs + No Higgs) that pass
         # the cuts, up to the target number of logged events.
         if state in ("Higgs", "No Higgs") and passes_cuts:
+            all_energies.extend(energies)
             logged_count += 1
             f.write(f"___EVENT_ID: {logged_count}___\n")
             for line in body:
                 f.write(line)
 
+#Graph all energies from the logged events
 if all_energies:
     plt.figure(figsize=(8, 5))
-    plt.hist(all_energies, bins=20, color="skyblue", edgecolor="black")
+    plt.hist(all_energies, bins=20)
     plt.xlabel("Energy (TeV)")
     plt.ylabel("Number of Particles")
     plt.title("Energy Distribution")
