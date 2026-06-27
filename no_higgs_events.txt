@@ -1,0 +1,40 @@
+___EVENT_ID: 1___
+State: Higgs
+N_Particles: 4
+Particle     Energy(TeV)     Angle(rad)      p_x(TeV)        p_z(TeV)       
+photon       11.667585       4.604596        -11.599865      -1.255255      
+photon       1.603874        2.190798        1.305356        -0.931910      
+proton       0.189401        3.503392        -0.067040       -0.177140      
+proton       0.139140        1.346457        10.361548       2.364304       
+___EVENT_ID: 2___
+State: No Higgs
+N_Particles: 4
+Particle     Energy(TeV)     Angle(rad)      p_x(TeV)        p_z(TeV)       
+photon       4.192230        5.224604        -3.654203       2.054651       
+photon       5.162122        1.920355        4.849938        -1.767939      
+proton       0.401207        1.747283        0.394975        -0.070441      
+proton       3.844441        4.577258        -1.590710       -0.216272      
+___EVENT_ID: 3___
+State: No Higgs
+N_Particles: 4
+Particle     Energy(TeV)     Angle(rad)      p_x(TeV)        p_z(TeV)       
+photon       9.054416        3.920148        -6.358481       -6.446098      
+photon       3.684125        6.004887        -1.012101       3.542376       
+proton       0.059754        4.452245        -0.057743       -0.015370      
+proton       0.801705        1.196367        7.428325        2.919092       
+___EVENT_ID: 4___
+State: No Higgs
+N_Particles: 4
+Particle     Energy(TeV)     Angle(rad)      p_x(TeV)        p_z(TeV)       
+photon       10.385769       4.995259        -9.973022       2.898797       
+photon       0.998395        3.848077        -0.648122       -0.759428      
+proton       1.770357        6.008811        -0.479669       1.704137       
+proton       0.445478        1.904114        11.100813       -3.843506      
+___EVENT_ID: 5___
+State: No Higgs
+N_Particles: 4
+Particle     Energy(TeV)     Angle(rad)      p_x(TeV)        p_z(TeV)       
+photon       3.248799        0.271120        0.870063        3.130126       
+photon       2.610562        4.373572        -2.462147       -0.867677      
+proton       4.462265        5.513561        -3.105136       3.204674       
+proton       3.278375        2.431796        4.697220        -5.467123      
