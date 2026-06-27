@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 TOTAL_ENERGY = 13.6  # TeV
-TARGET_LOGGED_EVENTS = 5
+TARGET_LOGGED_EVENTS = 1000
 OUTPUT_FILE = "no_higgs_events.txt"
 
 # Cuts
