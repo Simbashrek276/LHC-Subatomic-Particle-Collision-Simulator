@@ -1,3 +1,8 @@
+# chia function collision simulation va detection va fdata analysis
+# function collision run all colllisions and detection function run cutoffs and select events
+# function data analysis reads data file and draw histogram of energy distribution
+# 
+
 import math
 import random
 
