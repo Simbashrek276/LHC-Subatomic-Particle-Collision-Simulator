@@ -7,7 +7,6 @@
 import math
 import random
 
-import matplotlib
 import matplotlib.pyplot as plt
 
 TOTAL_ENERGY = 13.6  # TeV
@@ -156,6 +155,11 @@ for i in range(4):
     plt.title(f"Energy Distribution of {particle_names[i]} Particle")
 
     plt.tight_layout()
-    filename = f"{particle_names[i].lower()}_particle_energy_histogram.png"
+    filename = (
+        particle_names[i]
+        .lower()
+        .replace(" ", "_")
+        + "_energy_histogram.png"
+    )
     plt.savefig(filename)
     print(f"Histogram saved to {filename}")
