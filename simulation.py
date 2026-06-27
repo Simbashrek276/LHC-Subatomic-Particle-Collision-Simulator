@@ -62,6 +62,7 @@ with open(OUTPUT_FILE, "w") as f:
 
         n = len(particles)
         energies = []
+        energy_gamma1 = []
         angles = []
         px_list = []
         pz_list = []
@@ -97,6 +98,8 @@ with open(OUTPUT_FILE, "w") as f:
         angles.append(theta_last)
         px_list.append(px_last)
         pz_list.append(pz_last)
+
+        
 
         # Does the whole event pass the energy + angle cuts?
         passes_cuts = all(
@@ -135,12 +138,63 @@ with open(OUTPUT_FILE, "w") as f:
                 f.write(line)
 
 #Graph all energies from the logged events
-if all_energies:
-    plt.figure(figsize=(8, 5))
-    plt.hist(all_energies, bins=20)
-    plt.xlabel("Energy (TeV)")
-    plt.ylabel("Number of Particles")
-    plt.title("Energy Distribution")
-    plt.tight_layout()
-    plt.savefig("energy_histogram.png")
-    print("Histogram saved to energy_histogram.png")
+first_particle_energies = []
+print(len(all_energies))
+for i in range(0, len(all_energies), 4):
+    print(all_energies[i])
+    first_particle_energies.append(all_energies[i])
+
+second_particle_energies = []
+print(len(all_energies))
+for i in range(1, len(all_energies), 4):
+    print(all_energies[i])
+    second_particle_energies.append(all_energies[i])
+
+first_particle_energies = []
+print(len(all_energies))
+for i in range(2, len(all_energies), 4):
+    print(all_energies[i])
+    first_particle_energies.append(all_energies[i])
+
+second_particle_energies = []
+print(len(all_energies))
+for i in range(3, len(all_energies), 4):
+    print(all_energies[i])
+    second_particle_energies.append(all_energies[i])
+
+
+plt.figure(figsize=(8, 5))
+plt.hist(first_particle_energies, bins=20)
+plt.xlabel("Energy of first particle (TeV)")
+plt.ylabel("Number of Events")
+plt.title("Energy Distribution of First Particle")
+plt.tight_layout()
+plt.savefig("first_particle_energy_histogram.png")
+print("Histogram saved to first_particle_energy_histogram.png")
+
+plt.figure(figsize=(8, 5))
+plt.hist(second_particle_energies, bins=20)
+plt.xlabel("Energy of second particle (TeV)")
+plt.ylabel("Number of Events")
+plt.title("Energy Distribution of Second Particle")
+plt.tight_layout()
+plt.savefig("second_particle_energy_histogram.png")
+print("Histogram saved to second_particle_energy_histogram.png")
+
+plt.figure(figsize=(8, 5))
+plt.hist(first_particle_energies, bins=20)
+plt.xlabel("Energy of first particle (TeV)")
+plt.ylabel("Number of Events")
+plt.title("Energy Distribution of Third Particle")
+plt.tight_layout()
+plt.savefig("third_particle_energy_histogram.png")
+print("Histogram saved to third_particle_energy_histogram.png")
+
+plt.figure(figsize=(8, 5))
+plt.hist(second_particle_energies, bins=20)
+plt.xlabel("Energy of second particle (TeV)")
+plt.ylabel("Number of Events")
+plt.title("Energy Distribution of Fourth Particle")
+plt.tight_layout()
+plt.savefig("fourth_particle_energy_histogram.png")
+print("Histogram saved to fourth_particle_energy_histogram.png")
