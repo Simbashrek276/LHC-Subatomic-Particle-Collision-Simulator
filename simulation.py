@@ -13,7 +13,7 @@ import math
 import random
 
 TOTAL_ENERGY = 13.6  # TeV
-TARGET_LOGGED_EVENTS = 1000
+TARGET_LOGGED_EVENTS = 400000
 OUTPUT_FILE = "no_higgs_events.txt"
 
 MIN_ENERGY = 0.02 
@@ -28,15 +28,15 @@ ANGLE_RANGES = [
 # label for the photon/photon/proton/proton final state
 def choose_final_state():
     r = random.random()
-    if r < 0.25:
+    if r < 0.1: #past is 0.25
         return ["photon", "proton", "proton"], None
-    elif r < 0.26:
+    elif r < 0.4: #past is 0.26
         return ["photon", "photon", "proton", "proton"], "Higgs"
-    elif r < 0.30:
+    elif r < 0.8: #past is 0.30
         return ["photon", "photon", "proton", "proton"], "No Higgs"
-    elif r < 0.50:
+    elif r < 0.9: #past is 0.50
         return ["positron", "electron", "proton", "proton"], None
-    elif r < 0.68:
+    elif r < 0.95: #past is 0.68
         return ["muon", "antimuon", "proton", "proton"], None
     else:
         return ["neutron", "antineutron", "proton", "proton"], None
