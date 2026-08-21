@@ -1,243 +1,270 @@
-# I edited the file to 2 functions: 
-#
-#   1. collision()  -- throws the dice for a single collision: picks a final
-#                       state and shares out energy and momentum among the
-#                       particles.
-#   2. detector()   -- plays the role of the detector: it applies the energy
-#                       and angle cuts, prints what it saw, and records the
-#                       events we care about into no_higgs_events.txt.
-#
-# Run this file first to produce the data file, then run graphing.py to draw the histograms thing.
-
 import math
 import random
 
-TOTAL_ENERGY = 13.6  # TeV
-BEAM_ENERGY = 6.8  # TeV -- each of the two incoming protons carries half the total
-TARGET_LOGGED_EVENTS = 4000
-OUTPUT_FILE = "no_higgs_events.txt"
+TOTAL_ENERGY = 13.6
+TARGET_LOGGED_EVENTS = 100
+OUTPUT_FILE = "events.txt"
+MIN_ENERGY = 0.02
 
-MIN_ENERGY = 0.02 
 PI = math.pi
+
 ANGLE_RANGES = [
-    (1 / 18 * PI, 17 / 18 * PI),   # 10 to 170 degrees
-    (19 / 18 * PI, 35 / 18 * PI),  # 190 to 350 degrees
+    (10 * PI / 180, 170 * PI / 180),
+    (190 * PI / 180, 350 * PI / 180),
 ]
 
+MASS = {
+    "photon": 0.0,
+    "proton": 0.938,
+    "positron": 0.000511,
+    "electron": 0.000511,
+    "muon": 0.1057,
+    "antimuon": 0.1057,
+    "neutron": 0.9396,
+    "antineutron": 0.9396
+}
 
-# Each final state returns (particles, state_label). "Higgs" is only a STATE
-# label for the photon/photon/proton/proton final state
 def choose_final_state():
     r = random.random()
-    if r < 0.1: #past is 0.25
-        return ["photon", "proton", "proton"], None
-    elif r < 0.4: #past is 0.26
-        return ["photon", "photon", "proton", "proton"], "Higgs"
-    elif r < 0.8: #past is 0.30
-        return ["photon", "photon", "proton", "proton"], "No Higgs"
-    elif r < 0.9: #past is 0.50
-        return ["positron", "electron", "proton", "proton"], None
-    elif r < 0.95: #past is 0.68
-        return ["muon", "antimuon", "proton", "proton"], None
+    if r < 0.1:
+        return ["photon", "proton", "proton"]
+    elif r < 0.4:
+        return ["photon", "photon", "proton", "proton"]
+    elif r < 0.8:
+        return ["photon", "photon", "proton", "proton"]
+    elif r < 0.9:
+        return ["positron", "electron", "proton", "proton"]
+    elif r < 0.95:
+        return ["muon", "antimuon", "proton", "proton"]
     else:
-        return ["neutron", "antineutron", "proton", "proton"], None
-
+        return ["neutron", "antineutron", "proton", "proton"]
 
 def is_valid_angle(theta):
-    t = theta % (2 * PI)  # normalize to [0, 2*pi) first
+    theta = theta % (2 * PI)
     for low, high in ANGLE_RANGES:
-        if low <= t <= high:
+        if low <= theta <= high:
             return True
     return False
 
+def solve_scale(vectors, masses):
+    # This function finds a scale factor that makes the total
+    # energy of all particles equal to TOTAL_ENERGY (13.6 TeV).
+    #
+    # The original momentum vectors are randomly generated and
+    # do not necessarily have enough energy. Instead of changing
+    # their directions, we multiply all momenta by the same
+    # scale factor.
 
-def beam_split_energies():
-    """Work out four energies by asking how much of itself each proton gave up.
+    def total_energy(scale):
+        # Calculate the total energy of all particles
+        # after multiplying their momenta by the scale factor.
+        total = 0.0
 
-    Picture the actual smash: proton 1 and proton 2 come in carrying 6.8 TeV
-    each. Each one hands a slice of its energy over to a photon and keeps the
-    rest. So we only need to roll two numbers -- x1 for the first proton and x2
-    for the second -- and everything else follows:
+        for vector, mass in zip(vectors, masses):
 
-        photon 3 = x1 * 6.8        proton 5 = (1 - x1) * 6.8
-        photon 4 = x2 * 6.8        proton 6 = (1 - x2) * 6.8
+            # Scale the x and z components of momentum.
+            px = scale * vector[0]
+            pz = scale * vector[1]
 
-    What a proton gives away plus what it keeps is just its whole 6.8 TeV, so
-    the four energies always add straight back up to the full 13.6 TeV. 
-    """
-    x1 = random.random()
-    x2 = random.random()
-    return [
-        x1 * BEAM_ENERGY,        # photon 3 -- the slice proton 1 gave up
-        x2 * BEAM_ENERGY,        # photon 4 -- the slice proton 2 gave up
-        (1 - x1) * BEAM_ENERGY,  # proton 5 -- what proton 1 held on to
-        (1 - x2) * BEAM_ENERGY,  # proton 6 -- what proton 2 held on to
-    ]
+            # Calculate the magnitude of the momentum:
+            # p = sqrt(px² + pz²)
+            p = math.sqrt(px * px + pz * pz)
 
+            # Calculate the relativistic energy:
+            # E = sqrt(p² + m²)
+            #
+            # The result is added to the total energy
+            # of all particles.
+            total += math.sqrt(p * p + mass * mass)
 
-def check_energy_adds_up(energies):
-    total = sum(energies)
-    if not math.isclose(total, TOTAL_ENERGY, abs_tol=1e-9):
-        raise ValueError(
-            f"Energy does not add up: particles total {total:.9f} TeV, "
-            f"but the collision started with {TOTAL_ENERGY} TeV"
-        )
-    return total
+        return total
 
+    # Start by searching for a scale factor between 0 and 1.
+    low = 0.0
+    high = 1.0
 
-def collision():
-    """Simulate a single collision and return everything it produced.
+    # If scale = 1 does not provide enough total energy,
+    # keep doubling the upper limit until the total energy
+    # is greater than or equal to 13.6 TeV.
+    #
+    # Example:
+    # scale = 1  → energy too low
+    # scale = 2  → energy too low
+    # scale = 4  → energy high enough
+    #
+    # Now the correct scale must be somewhere between 2 and 4.
+    while total_energy(high) < TOTAL_ENERGY:
+        high *= 2.0
 
-    We pick a final state, then hand out energy and momentum. There are two
-    ways the energy gets shared, depending on what came out:
+    # Use binary search to find the scale factor that gives
+    # a total energy as close as possible to 13.6 TeV.
+    #
+    # Each iteration cuts the possible range in half.
+    for _ in range(100):
 
-      * Two-photon states use beam_split_energies(): each incoming proton gives
-        a slice of its 6.8 TeV to a photon and keeps the rest.
-      * Everything else falls back to the older approach, where each particle
-        takes a random bite out of whatever budget is still on the table.
+        # Try the value halfway between low and high.
+        middle = (low + high) / 2.0
 
-    Either way the energies add up to TOTAL_ENERGY. The last particle's
-    momentum is then set to balance the others so the momenta sum to zero.
-    """
-    particles, state = choose_final_state()
+        # If this scale produces too little energy,
+        # the correct scale must be larger.
+        if total_energy(middle) < TOTAL_ENERGY:
+            low = middle
+
+        # Otherwise, the scale is large enough, so the
+        # correct value must be at or below this value.
+        else:
+            high = middle
+    # low and high are now extremely close to the correct
+    # scale factor, so return their midpoint.
+    return (low + high) / 2.0
+
+def generate_final_state(particles):
+    masses = [MASS[p] for p in particles]
     n = len(particles)
+    if sum(masses) > TOTAL_ENERGY:
+        return None
+    vectors = []
+    for _ in range(n - 1): #random momenta
+        theta = random.uniform(0, 2 * PI)
+        magnitude = random.uniform(0.1, 1.0)
+        px = magnitude * math.sin(theta)
+        pz = magnitude * math.cos(theta)
+        vectors.append((px, pz))
+    total_px = sum(v[0] for v in vectors)
+    total_pz = sum(v[1] for v in vectors)
+    vectors.append((-total_px, -total_pz))
+    scale = solve_scale(vectors, masses)
 
     energies = []
-    angles = []
     px_list = []
     pz_list = []
-    total_px = 0.0
-    total_pz = 0.0
+    angles = []
 
-    remaining_energy = TOTAL_ENERGY
+    for vector, mass in zip(vectors, masses):
+        px = scale * vector[0]
+        pz = scale * vector[1]
 
-    # The two-photon states get their energies from the beam-splitting picture
-    # above. Every other final state still shares out the budget the old way.
-    planned_energies = None
-    if state in ("Higgs", "No Higgs"):
-        planned_energies = beam_split_energies()
+        momentum = math.sqrt(px * px + pz * pz)
+        energy = math.sqrt(momentum * momentum + mass * mass)
 
-    # Share energy/momentum among the first n-1 particles.
-    for j in range(n - 1):
-        if planned_energies is not None:
-            E = planned_energies[j]
-        else:
-            E = random.uniform(0.0, remaining_energy)
-        remaining_energy -= E
-        theta = random.uniform(0, 2 * PI)
+        theta = math.atan2(px, pz)
 
-        pz = E * math.cos(theta)
-        px = E * math.sin(theta)
+        if theta < 0:
+            theta += 2 * PI
 
-        energies.append(E)
-        angles.append(theta)
         px_list.append(px)
         pz_list.append(pz)
-
-        total_px += px
-        total_pz += pz
-
-    # The last particle gets momentum that cancels everyone else's. Its energy is
-    # proton 6's share in the two-photon case, or the leftover budget otherwise.
-    if planned_energies is not None:
-        E_last = planned_energies[n - 1]
-    else:
-        E_last = remaining_energy
-    px_last = -total_px
-    pz_last = -total_pz
-    theta_last = math.atan2(px_last, pz_last)
-
-    energies.append(E_last)
-    angles.append(theta_last)
-    px_list.append(px_last)
-    pz_list.append(pz_last)
-
-    # Now that everyone has their share, make sure it still adds back up to 13.6.
-    check_energy_adds_up(energies)
+        energies.append(energy)
+        angles.append(theta)
 
     return {
         "particles": particles,
-        "state": state,
         "energies": energies,
         "angles": angles,
         "px_list": px_list,
-        "pz_list": pz_list,
+        "pz_list": pz_list
     }
 
+def two_to_three(particles):
+    if len(particles) != 3:
+        return None
+
+    return generate_final_state(particles)
+
+def two_to_four(particles):
+    if len(particles) != 4:
+        return None
+
+    return generate_final_state(particles)
+
+def collision():
+    particles = choose_final_state()
+    if len(particles) == 3:
+        return two_to_three(particles)
+    elif len(particles) == 4:
+        return two_to_four(particles)
+    return None
 
 def detector(event, f, collision_number, logged_so_far):
-    """Ham nay se look at one collision, apply the cuts, and record it if we want it.
-
-    Every collision is printed to the console (tagged with whether it passed
-    the cuts). Only the 2-photon/2-proton states (Higgs and No Higgs) that pass
-    all cuts get written to the output file. Returns the event's energies when
-    it was logged, otherwise None.
-    """
+    if event is None:
+        return None
     particles = event["particles"]
-    state = event["state"]
     energies = event["energies"]
     angles = event["angles"]
     px_list = event["px_list"]
     pz_list = event["pz_list"]
-    n = len(particles)
-
-    # An event passes only if EVERY particle clears the energy and angle cuts.
     passes_cuts = all(
         E >= MIN_ENERGY and is_valid_angle(theta)
         for E, theta in zip(energies, angles)
     )
-
-    # Build the particle rows once; both the console and the file reuse them.
-    body = [
-        f"State: {state}\n",
-        f"N_Particles: {n}\n",
-        f"{'Particle':<12} {'Energy(TeV)':<15} {'Angle(rad)':<15} {'p_x(TeV)':<15} {'p_z(TeV)':<15}\n",
-    ]
-    for particle, E, theta, px, pz in zip(
-        particles, energies, angles, px_list, pz_list
-    ):
-        body.append(
-            f"{particle:<12} {E:<15.6f} {theta % (2*PI):<15.6f} {px:<15.6f} {pz:<15.6f}\n"
-        )
-
-    # Show every collision we simulated, passed or failed. The running total is
-    # printed to screen only -- the data file keeps its original layout so the
-    # graphing scripts can still read it.
     total_energy = sum(energies)
-    cut_tag = "PASSED CUTS" if passes_cuts else "FAILED CUTS"
-    print(
-        f"___COLLISION: {collision_number}___ [{cut_tag}] "
-        f"[Total Energy: {total_energy:.6f} TeV]"
+    total_px = sum(px_list)
+    total_pz = sum(pz_list)
+    energy_ok = math.isclose(
+        total_energy,
+        TOTAL_ENERGY,
+        abs_tol=1e-8
     )
-    for line in body:
-        print(line, end="")
-    print()
+    momentum_ok = (
+        math.isclose(total_px, 0.0, abs_tol=1e-8)
+        and
+        math.isclose(total_pz, 0.0, abs_tol=1e-8)
+    )
+    if not energy_ok or not momentum_ok:
+        return None
+    if not passes_cuts:
+        return None
+    event_id = logged_so_far + 1
+    f.write(
+        f"___EVENT_ID: {event_id}___\n"
+    )
+    f.write(
+        f"N_Particles: {len(particles)}\n"
+    )
+    f.write(
+        f"{'Particle':<15}"
+        f"{'Energy(TeV)':<15}"
+        f"{'Angle(deg)':<15}"
+        f"{'p_x(TeV)':<15}"
+        f"{'p_z(TeV)':<15}\n"
+    )
+    for particle, E, theta, px, pz in zip(
+        particles,
+        energies,
+        angles,
+        px_list,
+        pz_list
+    ):
+        angle_degrees = theta * 180 / PI
+        f.write(
+            f"{particle:<15}"
+            f"{E:<15.6f}"
+            f"{angle_degrees:<15.6f}"
+            f"{px:<15.6f}"
+            f"{pz:<15.6f}\n"
+        )
+    f.write("\n")
+    return energies
 
-    # i keep only the 2-photon/2-proton events (Higgs + No Higgs) that pass cuts.
-    if state in ("Higgs", "No Higgs") and passes_cuts:
-        event_id = logged_so_far + 1
-        f.write(f"___EVENT_ID: {event_id}___\n")
-        for line in body:
-            f.write(line)
-        return energies
+logged_count = 0
+total_collisions = 0
 
-    return None
+with open(OUTPUT_FILE, "w") as f:
+    for collision_number in range(10000000):
+        if logged_count >= TARGET_LOGGED_EVENTS:
+            break
+        total_collisions += 1
+        event = collision()
+        energies = detector(
+            event,
+            f,
+            total_collisions,
+            logged_count
+        )
+        if energies is not None:
+            logged_count += 1
 
-
-def main():
-    logged_count = 0
-    total_collisions = 0
-
-    # I let the simulation run 
-    # until there are enough number of wanted 2photon2proton events.
-    with open(OUTPUT_FILE, "w") as f:
-        while logged_count < TARGET_LOGGED_EVENTS:
-            total_collisions += 1
-            event = collision()
-            energies = detector(event, f, total_collisions, logged_count)
-            if energies is not None:
-                logged_count += 1
-
-
-if __name__ == "__main__":
-    main()
+print("Simulation finished.")
+print(f"Total collisions: {total_collisions}")
+print(f"Accepted events: {logged_count}")
+print(f"Saved to: {OUTPUT_FILE}")
