@@ -24,20 +24,20 @@ MASS = {
     "antineutron": 0.9396
 }
 
-def choose_final_state():
+def choose_final_state(): 
     r = random.random()
-    if r < 0.1:
+    if r < 0.25: 
+        return ["photon", "proton"]
+    elif r < 0.43:
+        return ["neutron", "antineutron", "proton", "proton"] #1 2 3 4 5 6
+    elif r < 0.65:
         return ["photon", "proton", "proton"]
-    elif r < 0.4:
-        return ["photon", "photon", "proton", "proton"]
     elif r < 0.8:
-        return ["photon", "photon", "proton", "proton"]
-    elif r < 0.9:
         return ["positron", "electron", "proton", "proton"]
     elif r < 0.95:
         return ["muon", "antimuon", "proton", "proton"]
     else:
-        return ["neutron", "antineutron", "proton", "proton"]
+        return ["photon", "photon", "proton", "proton"]
 
 def is_valid_angle(theta):
     theta = theta % (2 * PI)
@@ -47,21 +47,10 @@ def is_valid_angle(theta):
     return False
 
 def solve_scale(vectors, masses):
-    # This function finds a scale factor that makes the total
-    # energy of all particles equal to TOTAL_ENERGY (13.6 TeV).
-    #
-    # The original momentum vectors are randomly generated and
-    # do not necessarily have enough energy. Instead of changing
-    # their directions, we multiply all momenta by the same
-    # scale factor.
-
     def total_energy(scale):
-        # Calculate the total energy of all particles
-        # after multiplying their momenta by the scale factor.
         total = 0.0
 
         for vector, mass in zip(vectors, masses):
-
             # Scale the x and z components of momentum.
             px = scale * vector[0]
             pz = scale * vector[1]
@@ -72,33 +61,21 @@ def solve_scale(vectors, masses):
 
             # Calculate the relativistic energy:
             # E = sqrt(p² + m²)
-            #
             # The result is added to the total energy
             # of all particles.
             total += math.sqrt(p * p + mass * mass)
 
         return total
-
-    # Start by searching for a scale factor between 0 and 1.
     low = 0.0
     high = 1.0
-
     # If scale = 1 does not provide enough total energy,
     # keep doubling the upper limit until the total energy
     # is greater than or equal to 13.6 TeV.
-    #
-    # Example:
-    # scale = 1  → energy too low
-    # scale = 2  → energy too low
-    # scale = 4  → energy high enough
-    #
-    # Now the correct scale must be somewhere between 2 and 4.
     while total_energy(high) < TOTAL_ENERGY:
         high *= 2.0
 
     # Use binary search to find the scale factor that gives
     # a total energy as close as possible to 13.6 TeV.
-    #
     # Each iteration cuts the possible range in half.
     for _ in range(100):
 
@@ -114,8 +91,6 @@ def solve_scale(vectors, masses):
         # correct value must be at or below this value.
         else:
             high = middle
-    # low and high are now extremely close to the correct
-    # scale factor, so return their midpoint.
     return (low + high) / 2.0
 
 def generate_final_state(particles):
