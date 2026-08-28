@@ -1,270 +1,167 @@
+"""LHC collision simulation.
+
+This file runs the experiment. It decides which particles come out of each
+collision, then judges the result with a simple detector and logs the events
+that pass. All the actual physics, meaning the energies, momenta, conservation,
+and boosts, lives in kinematics.py.
+
+The event flow from top to bottom is choose_final_state, then make_event, then
+the detector cuts, then write to file.
+"""
+
 import math
 import random
+from collections import namedtuple
 
-TOTAL_ENERGY = 13.6
-TARGET_LOGGED_EVENTS = 100
+import kinematics
+
+TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
+TARGET_LOGGED_EVENTS = 100    # stop once this many events pass the detector
 OUTPUT_FILE = "events.txt"
-MIN_ENERGY = 0.02
 
-PI = math.pi
+# Detector cuts. A particle is only seen if it is energetic enough and does not
+# disappear down the beam pipe.
+MIN_ENERGY = 0.02                             # TeV
+VISIBLE_ANGLES_DEG = [(10, 170), (190, 350)]  # angle windows the detector covers
 
-ANGLE_RANGES = [
-    (10 * PI / 180, 170 * PI / 180),
-    (190 * PI / 180, 350 * PI / 180),
-]
-
+# Real particle rest masses in TeV. Kept for reference only. The simulation now
+# treats every outgoing particle as massless, so these are not used when
+# generating events. They would matter again if we ever switch back to real masses.
 MASS = {
     "photon": 0.0,
-    "proton": 0.938,
-    "positron": 0.000511,
-    "electron": 0.000511,
-    "muon": 0.1057,
-    "antimuon": 0.1057,
-    "neutron": 0.9396,
-    "antineutron": 0.9396
+    "proton": 0.000938,
+    "positron": 0.000000511,
+    "electron": 0.000000511,
+    "muon": 0.0001057,
+    "antimuon": 0.0001057,
+    "neutron": 0.000939,
+    "antineutron": 0.000939,
 }
 
+# One outgoing particle. It carries its name plus everything the detector
+# measures about it.
+Particle = namedtuple("Particle", ["name", "energy", "px", "pz", "angle"])
+
+
+# Step 1. Choose what comes out of the collision.
 def choose_final_state():
+    """Randomly pick the list of particles produced by one collision."""
     r = random.random()
-    if r < 0.1:
+    if r < 0.25:
+        return ["photon", "proton"]
+    elif r < 0.43:
+        return ["neutron", "antineutron", "proton", "proton"]
+    elif r < 0.65:
         return ["photon", "proton", "proton"]
-    elif r < 0.4:
-        return ["photon", "photon", "proton", "proton"]
-    elif r < 0.8:
-        return ["photon", "photon", "proton", "proton"]
-    elif r < 0.9:
+    elif r < 0.80:
         return ["positron", "electron", "proton", "proton"]
     elif r < 0.95:
         return ["muon", "antimuon", "proton", "proton"]
     else:
-        return ["neutron", "antineutron", "proton", "proton"]
+        return ["photon", "photon", "proton", "proton"]
 
-def is_valid_angle(theta):
-    theta = theta % (2 * PI)
-    for low, high in ANGLE_RANGES:
-        if low <= theta <= high:
-            return True
-    return False
 
-def solve_scale(vectors, masses):
-    # This function finds a scale factor that makes the total
-    # energy of all particles equal to TOTAL_ENERGY (13.6 TeV).
-    #
-    # The original momentum vectors are randomly generated and
-    # do not necessarily have enough energy. Instead of changing
-    # their directions, we multiply all momenta by the same
-    # scale factor.
+# Step 2. Turn that list of names into a real event.
+def make_event(names):
+    """Give each named particle its energy, momentum, and angle.
 
-    def total_energy(scale):
-        # Calculate the total energy of all particles
-        # after multiplying their momenta by the scale factor.
-        total = 0.0
-
-        for vector, mass in zip(vectors, masses):
-
-            # Scale the x and z components of momentum.
-            px = scale * vector[0]
-            pz = scale * vector[1]
-
-            # Calculate the magnitude of the momentum:
-            # p = sqrt(px² + pz²)
-            p = math.sqrt(px * px + pz * pz)
-
-            # Calculate the relativistic energy:
-            # E = sqrt(p² + m²)
-            #
-            # The result is added to the total energy
-            # of all particles.
-            total += math.sqrt(p * p + mass * mass)
-
-        return total
-
-    # Start by searching for a scale factor between 0 and 1.
-    low = 0.0
-    high = 1.0
-
-    # If scale = 1 does not provide enough total energy,
-    # keep doubling the upper limit until the total energy
-    # is greater than or equal to 13.6 TeV.
-    #
-    # Example:
-    # scale = 1  → energy too low
-    # scale = 2  → energy too low
-    # scale = 4  → energy high enough
-    #
-    # Now the correct scale must be somewhere between 2 and 4.
-    while total_energy(high) < TOTAL_ENERGY:
-        high *= 2.0
-
-    # Use binary search to find the scale factor that gives
-    # a total energy as close as possible to 13.6 TeV.
-    #
-    # Each iteration cuts the possible range in half.
-    for _ in range(100):
-
-        # Try the value halfway between low and high.
-        middle = (low + high) / 2.0
-
-        # If this scale produces too little energy,
-        # the correct scale must be larger.
-        if total_energy(middle) < TOTAL_ENERGY:
-            low = middle
-
-        # Otherwise, the scale is large enough, so the
-        # correct value must be at or below this value.
-        else:
-            high = middle
-    # low and high are now extremely close to the correct
-    # scale factor, so return their midpoint.
-    return (low + high) / 2.0
-
-def generate_final_state(particles):
-    masses = [MASS[p] for p in particles]
-    n = len(particles)
-    if sum(masses) > TOTAL_ENERGY:
-        return None
-    vectors = []
-    for _ in range(n - 1): #random momenta
-        theta = random.uniform(0, 2 * PI)
-        magnitude = random.uniform(0.1, 1.0)
-        px = magnitude * math.sin(theta)
-        pz = magnitude * math.cos(theta)
-        vectors.append((px, pz))
-    total_px = sum(v[0] for v in vectors)
-    total_pz = sum(v[1] for v in vectors)
-    vectors.append((-total_px, -total_pz))
-    scale = solve_scale(vectors, masses)
-
-    energies = []
-    px_list = []
-    pz_list = []
-    angles = []
-
-    for vector, mass in zip(vectors, masses):
-        px = scale * vector[0]
-        pz = scale * vector[1]
-
-        momentum = math.sqrt(px * px + pz * pz)
-        energy = math.sqrt(momentum * momentum + mass * mass)
-
-        theta = math.atan2(px, pz)
-
-        if theta < 0:
-            theta += 2 * PI
-
-        px_list.append(px)
-        pz_list.append(pz)
-        energies.append(energy)
-        angles.append(theta)
-
-    return {
-        "particles": particles,
-        "energies": energies,
-        "angles": angles,
-        "px_list": px_list,
-        "pz_list": pz_list
-    }
-
-def two_to_three(particles):
-    if len(particles) != 3:
+    We ask the physics engine for the four momenta. It only needs to know how
+    many particles there are, since every particle is treated as massless. Then
+    we pair each result back with its name and work out its emission angle. We
+    return a list of Particle objects.
+    """
+    momenta = kinematics.generate_momenta(len(names), TOTAL_ENERGY)
+    if momenta is None:
         return None
 
-    return generate_final_state(particles)
+    event = []
+    for name, p in zip(names, momenta):
+        # z is the horizontal left right axis and x is the vertical up down axis.
+        # The angle is measured from the z axis, so 0 degrees points right along z
+        # and 90 degrees points straight up along x.
+        angle = math.atan2(p.px, p.pz) % (2 * math.pi)
+        event.append(Particle(name, p.E, p.px, p.pz, angle))
+    return event
 
-def two_to_four(particles):
-    if len(particles) != 4:
-        return None
-
-    return generate_final_state(particles)
 
 def collision():
-    particles = choose_final_state()
-    if len(particles) == 3:
-        return two_to_three(particles)
-    elif len(particles) == 4:
-        return two_to_four(particles)
-    return None
+    """Simulate one whole collision. Choose a final state, then generate it."""
+    return make_event(choose_final_state())
 
-def detector(event, f, collision_number, logged_so_far):
-    if event is None:
-        return None
-    particles = event["particles"]
-    energies = event["energies"]
-    angles = event["angles"]
-    px_list = event["px_list"]
-    pz_list = event["pz_list"]
-    passes_cuts = all(
-        E >= MIN_ENERGY and is_valid_angle(theta)
-        for E, theta in zip(energies, angles)
+
+# Step 3. The detector.
+def is_seen(particle):
+    """True if the detector can measure this particle, meaning it passes the cuts."""
+    if particle.energy < MIN_ENERGY:
+        return False
+    angle_deg = math.degrees(particle.angle)
+    return any(low <= angle_deg <= high for low, high in VISIBLE_ANGLES_DEG)
+
+
+def passes_cuts(event):
+    """The event is kept only if every particle in it is seen."""
+    return all(is_seen(p) for p in event)
+
+
+def is_conserved(event):
+    """Sanity check that energy sums to 13.6 TeV and momentum sums to zero.
+
+    The physics engine guarantees this by construction. We re-check to catch any
+    mistake. The small tolerance absorbs the floating point noise that Lorentz
+    boosts leave behind.
+    """
+    total_E = sum(p.energy for p in event)
+    total_px = sum(p.px for p in event)
+    total_pz = sum(p.pz for p in event)
+    return (
+        math.isclose(total_E, TOTAL_ENERGY, abs_tol=1e-6)
+        and math.isclose(total_px, 0.0, abs_tol=1e-6)
+        and math.isclose(total_pz, 0.0, abs_tol=1e-6)
     )
-    total_energy = sum(energies)
-    total_px = sum(px_list)
-    total_pz = sum(pz_list)
-    energy_ok = math.isclose(
-        total_energy,
-        TOTAL_ENERGY,
-        abs_tol=1e-8
-    )
-    momentum_ok = (
-        math.isclose(total_px, 0.0, abs_tol=1e-8)
-        and
-        math.isclose(total_pz, 0.0, abs_tol=1e-8)
-    )
-    if not energy_ok or not momentum_ok:
-        return None
-    if not passes_cuts:
-        return None
-    event_id = logged_so_far + 1
+
+
+# Step 4. Write an accepted event to the file.
+def write_event(f, event_id, event):
+    f.write(f"___EVENT_ID: {event_id}___\n")
+    f.write(f"N_Particles: {len(event)}\n")
     f.write(
-        f"___EVENT_ID: {event_id}___\n"
+        f"{'Particle':<15}{'Energy(TeV)':<15}{'Angle(deg)':<15}"
+        f"{'p_x(TeV)':<15}{'p_z(TeV)':<15}\n"
     )
-    f.write(
-        f"N_Particles: {len(particles)}\n"
-    )
-    f.write(
-        f"{'Particle':<15}"
-        f"{'Energy(TeV)':<15}"
-        f"{'Angle(deg)':<15}"
-        f"{'p_x(TeV)':<15}"
-        f"{'p_z(TeV)':<15}\n"
-    )
-    for particle, E, theta, px, pz in zip(
-        particles,
-        energies,
-        angles,
-        px_list,
-        pz_list
-    ):
-        angle_degrees = theta * 180 / PI
+    for p in event:
         f.write(
-            f"{particle:<15}"
-            f"{E:<15.6f}"
-            f"{angle_degrees:<15.6f}"
-            f"{px:<15.6f}"
-            f"{pz:<15.6f}\n"
+            f"{p.name:<15}{p.energy:<15.6f}{math.degrees(p.angle):<15.6f}"
+            f"{p.px:<15.6f}{p.pz:<15.6f}\n"
         )
     f.write("\n")
-    return energies
 
-logged_count = 0
-total_collisions = 0
 
-with open(OUTPUT_FILE, "w") as f:
-    for collision_number in range(10000000):
-        if logged_count >= TARGET_LOGGED_EVENTS:
-            break
-        total_collisions += 1
-        event = collision()
-        energies = detector(
-            event,
-            f,
-            total_collisions,
-            logged_count
-        )
-        if energies is not None:
-            logged_count += 1
+# Step 5. Run collisions until enough events pass.
+def run_simulation():
+    """Collide until TARGET_LOGGED_EVENTS good events are logged. Returns counts."""
+    logged = 0
+    total = 0
+    with open(OUTPUT_FILE, "w") as f:
+        while logged < TARGET_LOGGED_EVENTS:
+            total += 1
+            event = collision()
 
-print("Simulation finished.")
-print(f"Total collisions: {total_collisions}")
-print(f"Accepted events: {logged_count}")
-print(f"Saved to: {OUTPUT_FILE}")
+            # Skip anything impossible, not conserving, or unseen by the detector.
+            if event is None or not is_conserved(event) or not passes_cuts(event):
+                continue
+
+            logged += 1
+            write_event(f, logged, event)
+    return total, logged
+
+
+def main():
+    total, logged = run_simulation()
+    print("Simulation finished.")
+    print(f"Total collisions: {total}")
+    print(f"Accepted events: {logged}")
+    print(f"Saved to: {OUTPUT_FILE}")
+
+
+if __name__ == "__main__":
+    main()
