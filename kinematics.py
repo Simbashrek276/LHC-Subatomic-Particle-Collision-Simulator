@@ -40,6 +40,7 @@ MASS_FLOOR = 1e-3  # TeV
 # Section 1. The four vector
 
 # A particle's energy and its momentum in the 2D (x, z) plane.
+# maybe rename this to NP?
 P4 = namedtuple("P4", ["E", "px", "pz"])
 
 
@@ -74,8 +75,10 @@ def two_body_decay(parent_mass, m1, m2):
     each daughter's energy exactly, so the heavier daughter keeps more of the
     energy. The only random choice is the direction. We return the two daughters
     as four vectors in the parent's rest frame.
+
+    On the basis of parent particle staying still
     """
-    M = parent_mass
+    M = parent_mass #13.6 TeV
     E1 = (M ** 2 + m1 ** 2 - m2 ** 2) / (2 * M)
     E2 = M - E1
 
@@ -97,33 +100,48 @@ def boost(p4, parent_p4):
     composite is really flying through the lab, so its daughters have to be sped
     up to match. parent_p4 is the composite as seen in the lab. p4 is a daughter
     as measured in the composite's rest frame.
+
+    We dont need this for 2 to 2 simulations
+
+    Input:
+        (1) vector p (E, px, pz): the energy momentum of the parent particle in the lab frame
+        (2) vector p4 (E, px, pz): the energy momentum of the child particle in the 
+        rest frame of the parent particle (will be boost's argument)
+    Output: vector new_P4(E, px, pz): Calculate the vector of non-momentum of the child particle in the lab frame
+    (which is equation 8 in the report)
     """
-    E_A = parent_p4.E
+    E_A = parent_p4.E 
     if E_A <= 0:
         return p4
 
     # Boost velocity of the composite, in units where c is 1.
     bx = parent_p4.px / E_A
     bz = parent_p4.pz / E_A
-    speed_squared = bx ** 2 + bz ** 2
+    X = bx ** 2 + bz ** 2 
 
     # If the composite is basically at rest there is nothing to boost.
-    if speed_squared <= 1e-15:
+    if X <= 1e-15:
         return p4
 
-    gamma = 1.0 / math.sqrt(1.0 - speed_squared)
+    gamma = 1.0 / math.sqrt(1.0 - X)
 
-    # Standard Lorentz boost along the (bx, bz) direction, written out from the
-    # matrix in the report.
-    b_dot_p = bx * p4.px + bz * p4.pz
-    factor = (gamma - 1.0) / speed_squared * b_dot_p + gamma * p4.E
+    # calculate matrix A (a21, a22, ..... based on the newest version of the report)
+    A11 = gamma
+    A12 = bx*gamma
+    A13 = bz*gamma
+    A21 = bx*gamma
+    A22 = ((gamma - 1)/X) * (bx**2) + 1
+    A23 = ((gamma - 1)/X) * bx * bz
+    A31 = gamma*bz
+    A32 = ((gamma - 1)/X) * bx * bz
+    A33 = ((gamma - 1)/(X)) * (bz**2) + 1
 
-    return P4(
-        gamma * (p4.E + b_dot_p),
-        p4.px + bx * factor,
-        p4.pz + bz * factor,
-    )
+    # Apply the boost using matrix multiplication p = [A] * [p4]
+    new_E = A11 * p4.E + A12 * p4.px + A13 * p4.pz
+    new_px = A21 * p4.E + A22 * p4.px + A23 * p4.pz
+    new_pz = A31 * p4.E + A32 * p4.px + A33 * p4.pz
 
+    return P4(new_E, new_px, new_pz)
 
 def decay_in_lab(parent_mass, m1, m2, parent_p4):
     """Split a composite that is moving, and hand back its daughters in the lab.
@@ -133,7 +151,8 @@ def decay_in_lab(parent_mass, m1, m2, parent_p4):
     composite's lab motion. The 2 to 3 and 2 to 4 generators use this so they do
     not repeat the same steps.
     """
-    d1, d2 = two_body_decay(parent_mass, m1, m2)
+
+    d1, d2 = two_body_decay(parent_mass, m1, m2) #find momentum of a child particle in the resting frame of the parent particle
     return boost(d1, parent_p4), boost(d2, parent_p4)
 
 
@@ -183,6 +202,11 @@ def two_to_three(total_energy):
 
     p3, p45 = two_body_decay(total_energy, 0.0, m45)  # split collision into 3 and (45)
     p4, p5 = decay_in_lab(m45, 0.0, 0.0, p45)         # split (45) into 4 and 5
+    #print(f"E4: {p4.E} p4: {p4}, E5: {p5.E}, p5: {p5}")
+    #print(f"p3: {p3}")
+    #print(f"p45: {p45}")
+    #print("p4 + p5 = ", p4.E + p5.E, p4.px + p5.px, p4.pz + p5.pz)
+    #print("p3 + p45 = ", p3.E + p45.E, p3.px + p45.px, p3.pz + p45.pz)
 
     return [p3, p4, p5]
 

@@ -16,7 +16,7 @@ from collections import namedtuple
 import kinematics
 
 TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
-TARGET_LOGGED_EVENTS = 100    # stop once this many events pass the detector
+TARGET_LOGGED_EVENTS = 1000    # stop once this many events pass the detector
 OUTPUT_FILE = "events.txt"
 
 # Detector cuts. A particle is only seen if it is energetic enough and does not
