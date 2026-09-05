@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 
 DATA_FILE = "events.txt"
 
-# In the 2 to 2 case the two particles are a photon (particle 3) and a proton
-# (particle 4). We keep them apart so each gets its own histogram.
-PARTICLE_LABELS = ["Photon (particle 3)", "Proton (particle 4)"]
+# In the 2 to 2 case the two particles are both protons (particle 3 and
+# particle 4). We keep them apart so each gets its own histogram.
+PARTICLE_LABELS = ["Proton (particle 3)", "Proton (particle 4)"]
 
 
 def read_2to2(filename, column):
