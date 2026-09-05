@@ -16,13 +16,13 @@ from collections import namedtuple
 import kinematics
 
 TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
-TARGET_LOGGED_EVENTS = 1000    # stop once this many events pass the detector
+TARGET_LOGGED_EVENTS = 100000    # stop once this many events pass the detector
 OUTPUT_FILE = "events.txt"
 
 # Detector cuts. A particle is only seen if it is energetic enough and does not
 # disappear down the beam pipe.
-MIN_ENERGY = 0.02                             # TeV
-VISIBLE_ANGLES_DEG = [(10, 170), (190, 350)]  # angle windows the detector covers
+MIN_ENERGY = 0.00                             # TeV
+VISIBLE_ANGLES_DEG = [(0, 180), (180, 360)]  # angle windows the detector covers
 
 # Real particle rest masses in TeV. Kept for reference only. The simulation now
 # treats every outgoing particle as massless, so these are not used when
@@ -48,7 +48,7 @@ def choose_final_state():
     """Randomly pick the list of particles produced by one collision."""
     r = random.random()
     if r < 0.25:
-        return ["photon", "proton"]
+        return ["proton", "proton"]
     elif r < 0.43:
         return ["neutron", "antineutron", "proton", "proton"]
     elif r < 0.65:
