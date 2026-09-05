@@ -28,20 +28,20 @@ def read_2to2(filename, column):
     return per_particle
 
 
-angles = read_2to2(DATA_FILE, column=2)
-total_events = len(angles[0])   # one entry per 2 to 2 event
+energies = read_2to2(DATA_FILE, column=1)
+total_events = len(energies[0])   # one entry per 2 to 2 event
 print("Total 2 to 2 events:", total_events)
 
-# One angle histogram per particle.
+# One energy histogram per particle.
 for i in range(2):
     plt.figure(figsize=(8, 5))
-    plt.hist(angles[i], bins=36, range=(0, 360))   # 36 bins means 10 degrees each
+    plt.hist(energies[i], bins=40, range=(0, 13.6))   # 13.6 TeV is the full energy
 
-    plt.xlabel(f"Flight angle of {PARTICLE_LABELS[i]} (degrees)")
+    plt.xlabel(f"Energy of {PARTICLE_LABELS[i]} (TeV)")
     plt.ylabel("Number of events")
-    plt.title(f"Angle Distribution for the 2 to 2 Case (total events = {total_events})")
+    plt.title(f"Energy Distribution for the 2 to 2 Case (total events = {total_events})")
 
     plt.tight_layout()
-    filename = f"2to2_angle_particle{i + 3}.png"   # particle 3 and particle 4
+    filename = f"2to2_energy_particle{i + 3}.png"   # particle 3 and particle 4
     plt.savefig(filename)
     print("Histogram saved to", filename)
