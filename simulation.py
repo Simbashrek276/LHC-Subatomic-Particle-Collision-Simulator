@@ -7,6 +7,11 @@ and boosts, lives in kinematics.py.
 
 The event flow from top to bottom is choose_final_state, then make_event, then
 the detector cuts, then write to file.
+
+This is the full 3D version: every particle now carries a py component in
+addition to px and pz, and instead of a single planar angle each particle has
+two angles -- a polar angle theta (measured from the z axis) and an azimuthal
+angle phi (measured around the z axis, in the x-y plane).
 """
 
 import math
@@ -20,9 +25,12 @@ TARGET_LOGGED_EVENTS = 100000    # stop once this many events pass the detector
 OUTPUT_FILE = "events.txt"
 
 # Detector cuts. A particle is only seen if it is energetic enough and does not
-# disappear down the beam pipe.
+# disappear down the beam pipe. The angular cut is now on the polar angle theta
+# (angle from the beam axis, z), which is the physically meaningful one for a
+# beam-pipe cut in 3D -- phi is just the angle around the beam and a real
+# detector is normally uniform in phi.
 MIN_ENERGY = 0.00                             # TeV
-VISIBLE_ANGLES_DEG = [(0, 180), (180, 360)]  # angle windows the detector covers
+VISIBLE_THETA_DEG = (0, 180)                  # polar angle window the detector covers
 
 # Real particle rest masses in TeV. Kept for reference only. The simulation now
 # treats every outgoing particle as massless, so these are not used when
@@ -39,8 +47,9 @@ MASS = {
 }
 
 # One outgoing particle. It carries its name plus everything the detector
-# measures about it.
-Particle = namedtuple("Particle", ["name", "energy", "px", "pz", "angle"])
+# measures about it. theta is the polar angle from the z axis, phi is the
+# azimuthal angle around the z axis in the x-y plane.
+Particle = namedtuple("Particle", ["name", "energy", "px", "py", "pz", "theta", "phi"])
 
 
 # Step 1. Choose what comes out of the collision.
@@ -63,11 +72,11 @@ def choose_final_state():
 
 # Step 2. Turn that list of names into a real event.
 def make_event(names):
-    """Give each named particle its energy, momentum, and angle.
+    """Give each named particle its energy, momentum, and angles.
 
     We ask the physics engine for the four momenta. It only needs to know how
     many particles there are, since every particle is treated as massless. Then
-    we pair each result back with its name and work out its emission angle. We
+    we pair each result back with its name and work out its emission angles. We
     return a list of Particle objects.
     """
     momenta = kinematics.generate_momenta(len(names), TOTAL_ENERGY)
@@ -76,11 +85,16 @@ def make_event(names):
 
     event = []
     for name, p in zip(names, momenta):
-        # z is the horizontal left right axis and x is the vertical up down axis.
-        # The angle is measured from the z axis, so 0 degrees points right along z
-        # and 90 degrees points straight up along x.
-        angle = math.atan2(p.px, p.pz) % (2 * math.pi)
-        event.append(Particle(name, p.E, p.px, p.pz, angle))
+        # theta is measured from the z axis (0 = straight down the beam line,
+        # 180 = straight back the other way). phi is measured around the z axis
+        # in the x-y plane, the same way the old 2D angle was measured from z.
+        p_mag = math.sqrt(p.px ** 2 + p.py ** 2 + p.pz ** 2)
+        if p_mag > 0:
+            theta = math.acos(max(-1.0, min(1.0, p.pz / p_mag)))
+        else:
+            theta = 0.0
+        phi = math.atan2(p.py, p.px) % (2 * math.pi)
+        event.append(Particle(name, p.E, p.px, p.py, p.pz, theta, phi))
     return event
 
 
@@ -94,8 +108,9 @@ def is_seen(particle):
     """True if the detector can measure this particle, meaning it passes the cuts."""
     if particle.energy < MIN_ENERGY:
         return False
-    angle_deg = math.degrees(particle.angle)
-    return any(low <= angle_deg <= high for low, high in VISIBLE_ANGLES_DEG)
+    theta_deg = math.degrees(particle.theta)
+    low, high = VISIBLE_THETA_DEG
+    return low <= theta_deg <= high
 
 
 def passes_cuts(event):
@@ -112,10 +127,12 @@ def is_conserved(event):
     """
     total_E = sum(p.energy for p in event)
     total_px = sum(p.px for p in event)
+    total_py = sum(p.py for p in event)
     total_pz = sum(p.pz for p in event)
     return (
         math.isclose(total_E, TOTAL_ENERGY, abs_tol=1e-6)
         and math.isclose(total_px, 0.0, abs_tol=1e-6)
+        and math.isclose(total_py, 0.0, abs_tol=1e-6)
         and math.isclose(total_pz, 0.0, abs_tol=1e-6)
     )
 
@@ -125,13 +142,13 @@ def write_event(f, event_id, event):
     f.write(f"___EVENT_ID: {event_id}___\n")
     f.write(f"N_Particles: {len(event)}\n")
     f.write(
-        f"{'Particle':<15}{'Energy(TeV)':<15}{'Angle(deg)':<15}"
-        f"{'p_x(TeV)':<15}{'p_z(TeV)':<15}\n"
+        f"{'Particle':<15}{'Energy(TeV)':<15}{'Theta(deg)':<15}{'Phi(deg)':<15}"
+        f"{'p_x(TeV)':<15}{'p_y(TeV)':<15}{'p_z(TeV)':<15}\n"
     )
     for p in event:
         f.write(
-            f"{p.name:<15}{p.energy:<15.6f}{math.degrees(p.angle):<15.6f}"
-            f"{p.px:<15.6f}{p.pz:<15.6f}\n"
+            f"{p.name:<15}{p.energy:<15.6f}{math.degrees(p.theta):<15.6f}"
+            f"{math.degrees(p.phi):<15.6f}{p.px:<15.6f}{p.py:<15.6f}{p.pz:<15.6f}\n"
         )
     f.write("\n")
 
@@ -164,4 +181,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()  

@@ -22,6 +22,11 @@ that carry mass are the made up composites in the middle. Two photons flying
 apart still add up to a real heavy combined mass even though each photon weighs
 nothing. That is why the composites need a mass and a boost while the final
 particles do not.
+
+This is the full 3D version: momentum now has three spatial components
+(px, py, pz) instead of two. Random directions are drawn isotropically over the
+sphere instead of uniformly over a circle, and the boost is the general 3D
+Lorentz boost matrix rather than the 2D special case.
 """
 
 import math
@@ -39,9 +44,9 @@ MASS_FLOOR = 1e-3  # TeV
 
 # Section 1. The four vector
 
-# A particle's energy and its momentum in the 2D (x, z) plane.
+# A particle's energy and its momentum in 3D (x, y, z) space.
 # maybe rename this to NP?
-P4 = namedtuple("P4", ["E", "px", "pz"])
+P4 = namedtuple("P4", ["E", "px", "py", "pz"])
 
 
 def mass(p4):
@@ -50,7 +55,7 @@ def mass(p4):
     We clamp at zero first, because float noise can push a genuinely massless
     particle a tiny bit below zero inside the square root.
     """
-    m2 = p4.E ** 2 - p4.px ** 2 - p4.pz ** 2
+    m2 = p4.E ** 2 - p4.px ** 2 - p4.py ** 2 - p4.pz ** 2
     return math.sqrt(max(m2, 0.0))
 
 
@@ -61,8 +66,9 @@ def invariant_mass(*p4s):
     """
     E = sum(p.E for p in p4s)
     px = sum(p.px for p in p4s)
+    py = sum(p.py for p in p4s)
     pz = sum(p.pz for p in p4s)
-    return mass(P4(E, px, pz))
+    return mass(P4(E, px, py, pz))
 
 
 # Section 2. The two building blocks, decay and boost
@@ -73,12 +79,14 @@ def two_body_decay(parent_mass, m1, m2):
     Because the parent is at rest, the daughters must fly off in opposite
     directions with equal and opposite momentum. Energy conservation then fixes
     each daughter's energy exactly, so the heavier daughter keeps more of the
-    energy. The only random choice is the direction. We return the two daughters
-    as four vectors in the parent's rest frame.
+    energy. The only random choice is the direction, now drawn isotropically
+    over the full sphere (a polar angle theta and an azimuthal angle phi)
+    instead of a single angle in a plane. We return the two daughters as four
+    vectors in the parent's rest frame.
 
     On the basis of parent particle staying still
     """
-    M = parent_mass #13.6 TeV
+    M = parent_mass  # 13.6 TeV
     E1 = (M ** 2 + m1 ** 2 - m2 ** 2) / (2 * M)
     E2 = M - E1
 
@@ -86,11 +94,18 @@ def two_body_decay(parent_mass, m1, m2):
     # so that float noise or a too light parent can never make it negative.
     p = math.sqrt(max(E1 ** 2 - m1 ** 2, 0.0))
 
-    theta = random.uniform(0, 2 * PI)
-    px = p * math.sin(theta)
-    pz = p * math.cos(theta)
+    # Isotropic direction on the sphere: phi uniform in [0, 2pi), and
+    # cos(theta) uniform in [-1, 1] (NOT theta itself uniform -- that would
+    # bunch points near the poles).
+    phi = random.uniform(0, 2 * PI)
+    cos_theta = random.uniform(-1.0, 1.0)
+    sin_theta = math.sqrt(max(1.0 - cos_theta ** 2, 0.0))
 
-    return P4(E1, px, pz), P4(E2, -px, -pz)
+    px = p * sin_theta * math.cos(phi)
+    py = p * sin_theta * math.sin(phi)
+    pz = p * cos_theta
+
+    return P4(E1, px, py, pz), P4(E2, -px, -py, -pz)
 
 
 def boost(p4, parent_p4):
@@ -101,47 +116,61 @@ def boost(p4, parent_p4):
     up to match. parent_p4 is the composite as seen in the lab. p4 is a daughter
     as measured in the composite's rest frame.
 
-    We dont need this for 2 to 2 simulations
+    This is now the general 3D Lorentz boost (a 4x4 matrix instead of the
+    3x3 special case used when momentum only had two components).
 
     Input:
-        (1) vector p (E, px, pz): the energy momentum of the parent particle in the lab frame
-        (2) vector p4 (E, px, pz): the energy momentum of the child particle in the 
-        rest frame of the parent particle (will be boost's argument)
-    Output: vector new_P4(E, px, pz): Calculate the vector of non-momentum of the child particle in the lab frame
-    (which is equation 8 in the report)
+        (1) vector p (E, px, py, pz): the energy momentum of the parent particle
+        in the lab frame
+        (2) vector p4 (E, px, py, pz): the energy momentum of the child particle
+        in the rest frame of the parent particle (will be boost's argument)
+    Output: vector new_P4(E, px, py, pz): the four vector of the child particle
+    in the lab frame (the 3D generalization of equation 8 in the report)
     """
-    E_A = parent_p4.E 
+    E_A = parent_p4.E
     if E_A <= 0:
         return p4
 
     # Boost velocity of the composite, in units where c is 1.
     bx = parent_p4.px / E_A
+    by = parent_p4.py / E_A
     bz = parent_p4.pz / E_A
-    X = bx ** 2 + bz ** 2 
+    X = bx ** 2 + by ** 2 + bz ** 2  # |beta|^2
 
     # If the composite is basically at rest there is nothing to boost.
     if X <= 1e-15:
         return p4
 
     gamma = 1.0 / math.sqrt(1.0 - X)
+    k = (gamma - 1) / X  # shared factor in the spatial-spatial block
 
-    # calculate matrix A (a21, a22, ..... based on the newest version of the report)
-    A11 = gamma
-    A12 = bx*gamma
-    A13 = bz*gamma
-    A21 = bx*gamma
-    A22 = ((gamma - 1)/X) * (bx**2) + 1
-    A23 = ((gamma - 1)/X) * bx * bz
-    A31 = gamma*bz
-    A32 = ((gamma - 1)/X) * bx * bz
-    A33 = ((gamma - 1)/(X)) * (bz**2) + 1
+    # 4x4 boost matrix, built the same way as the 2D 3x3 version: a time row/
+    # column of gamma*beta, and a spatial block of delta_ij + k*beta_i*beta_j.
+    A00 = gamma
+    A0x, A0y, A0z = gamma * bx, gamma * by, gamma * bz
 
-    # Apply the boost using matrix multiplication p = [A] * [p4]
-    new_E = A11 * p4.E + A12 * p4.px + A13 * p4.pz
-    new_px = A21 * p4.E + A22 * p4.px + A23 * p4.pz
-    new_pz = A31 * p4.E + A32 * p4.px + A33 * p4.pz
+    Ax0 = gamma * bx
+    Axx = k * bx * bx + 1
+    Axy = k * bx * by
+    Axz = k * bx * bz
 
-    return P4(new_E, new_px, new_pz)
+    Ay0 = gamma * by
+    Ayx = k * by * bx
+    Ayy = k * by * by + 1
+    Ayz = k * by * bz
+
+    Az0 = gamma * bz
+    Azx = k * bz * bx
+    Azy = k * bz * by
+    Azz = k * bz * bz + 1
+
+    new_E = A00 * p4.E + A0x * p4.px + A0y * p4.py + A0z * p4.pz
+    new_px = Ax0 * p4.E + Axx * p4.px + Axy * p4.py + Axz * p4.pz
+    new_py = Ay0 * p4.E + Ayx * p4.px + Ayy * p4.py + Ayz * p4.pz
+    new_pz = Az0 * p4.E + Azx * p4.px + Azy * p4.py + Azz * p4.pz
+
+    return P4(new_E, new_px, new_py, new_pz)
+
 
 def decay_in_lab(parent_mass, m1, m2, parent_p4):
     """Split a composite that is moving, and hand back its daughters in the lab.
@@ -152,7 +181,7 @@ def decay_in_lab(parent_mass, m1, m2, parent_p4):
     not repeat the same steps.
     """
 
-    d1, d2 = two_body_decay(parent_mass, m1, m2) #find momentum of a child particle in the resting frame of the parent particle
+    d1, d2 = two_body_decay(parent_mass, m1, m2)  # momentum of a child particle in the resting frame of the parent particle
     return boost(d1, parent_p4), boost(d2, parent_p4)
 
 
@@ -181,13 +210,17 @@ def two_to_two(total_energy):
     With only two of them there is nothing to group, so no composite and no boost
     is needed. Both are massless, so they simply share the energy evenly. Each
     takes half and they fly off in exactly opposite directions. The only thing we
-    roll is which way the split points.
+    roll is which way the split points, now isotropically over the sphere.
     """
     E = total_energy / 2.0
-    theta = random.uniform(0, 2 * PI)
-    px = E * math.sin(theta)
-    pz = E * math.cos(theta)
-    return [P4(E, px, pz), P4(E, -px, -pz)]
+    phi = random.uniform(0, 2 * PI)
+    cos_theta = random.uniform(-1.0, 1.0)
+    sin_theta = math.sqrt(max(1.0 - cos_theta ** 2, 0.0))
+
+    px = E * sin_theta * math.cos(phi)
+    py = E * sin_theta * math.sin(phi)
+    pz = E * cos_theta
+    return [P4(E, px, py, pz), P4(E, -px, -py, -pz)]
 
 
 def two_to_three(total_energy):
@@ -201,12 +234,7 @@ def two_to_three(total_energy):
     m45 = draw_composite_mass(0.0, total_energy)      # mass of the (45) composite
 
     p3, p45 = two_body_decay(total_energy, 0.0, m45)  # split collision into 3 and (45)
-    p4, p5 = decay_in_lab(m45, 0.0, 0.0, p45)         # split (45) into 4 and 5
-    #print(f"E4: {p4.E} p4: {p4}, E5: {p5.E}, p5: {p5}")
-    #print(f"p3: {p3}")
-    #print(f"p45: {p45}")
-    #print("p4 + p5 = ", p4.E + p5.E, p4.px + p5.px, p4.pz + p5.pz)
-    #print("p3 + p45 = ", p3.E + p45.E, p3.px + p45.px, p3.pz + p45.pz)
+    p4, p5 = decay_in_lab(m45, 0.0, 0.0, p45)          # split (45) into 4 and 5
 
     return [p3, p4, p5]
 
@@ -226,8 +254,8 @@ def two_to_four(total_energy):
     m56 = draw_composite_mass(0.0, total_energy - m34)
 
     p34, p56 = two_body_decay(total_energy, m34, m56)   # split collision into (34) and (56)
-    p3, p4 = decay_in_lab(m34, 0.0, 0.0, p34)           # split (34) into 3 and 4
-    p5, p6 = decay_in_lab(m56, 0.0, 0.0, p56)           # split (56) into 5 and 6
+    p3, p4 = decay_in_lab(m34, 0.0, 0.0, p34)            # split (34) into 3 and 4
+    p5, p6 = decay_in_lab(m56, 0.0, 0.0, p56)            # split (56) into 5 and 6
 
     return [p3, p4, p5, p6]
 
