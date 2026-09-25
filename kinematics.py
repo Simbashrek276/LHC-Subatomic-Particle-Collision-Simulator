@@ -17,12 +17,6 @@ Read the file in this order.
     4. two_to_two, two_to_three, two_to_four, putting the blocks together
     5. generate_momenta, the one function simulation.py calls
 
-Every particle that actually comes out is treated as massless. The only things
-that carry mass are the made up composites in the middle. Two photons flying
-apart still add up to a real heavy combined mass even though each photon weighs
-nothing. That is why the composites need a mass and a boost while the final
-particles do not.
-
 This is the full 3D version: momentum now has three spatial components
 (px, py, pz) instead of two. Random directions are drawn isotropically over the
 sphere instead of uniformly over a circle, and the boost is the general 3D

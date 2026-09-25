@@ -1,0 +1,12 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+
+# OS and editor cruft
+.DS_Store
+Thumbs.db
+*.swp
