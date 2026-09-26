@@ -34,13 +34,17 @@ Run:  python graph_mass_steps.py
 """
 
 import os
+from pathlib import Path
 from itertools import combinations
 
 import event_data
 import step_plot
 
-DATA_FILE = "events.txt"
-OUTPUT_DIR = "plots"
+# Resolved from this file's location, not the working directory, so the
+# script runs the same from anywhere.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_FILE = PROJECT_ROOT / "collision_data" / "events.txt"
+OUTPUT_DIR = PROJECT_ROOT / "plots"
 
 TOTAL_ENERGY = 13.6   # TeV
 BINS = 50

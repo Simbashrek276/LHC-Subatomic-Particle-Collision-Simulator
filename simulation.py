@@ -17,12 +17,13 @@ angle phi (measured around the z axis, in the x-y plane).
 import math
 import random
 from collections import namedtuple
+from pathlib import Path
 
-import kinematics
+import utilities.kinematics as kinematics
 
 TOTAL_ENERGY = 13.6           # TeV, the LHC collision energy
 TARGET_LOGGED_EVENTS = 100000    # stop once this many events pass the detector
-OUTPUT_FILE = "events.txt"
+OUTPUT_FILE = Path(__file__).resolve().parent / "collision_data" / "events.txt"
 
 # Detector cuts. A particle is only seen if it is energetic enough and does not
 # disappear down the beam pipe. The angular cut is now on the polar angle theta
@@ -158,6 +159,9 @@ def run_simulation():
     """Collide until TARGET_LOGGED_EVENTS good events are logged. Returns counts."""
     logged = 0
     total = 0
+    # Create collision_data/ if it is not there, so a fresh clone can run this
+    # without having to make the folder by hand.
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, "w") as f:
         while logged < TARGET_LOGGED_EVENTS:
             total += 1

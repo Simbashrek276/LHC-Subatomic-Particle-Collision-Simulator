@@ -18,12 +18,17 @@ the generator in kinematics.py. Channel 2 is the 2 to 2 case, channel 3 is the
 2 to 3 case, channel 4 is the 2 to 4 case.
 """
 
-import math
 from collections import Counter
+from pathlib import Path
 
 import numpy as np
 
-DEFAULT_FILE = "events.txt"
+# Paths are worked out from this file's own location rather than from the
+# working directory, so the scripts behave the same whether you run them from
+# the project root, from inside analysis_tools/, or from the VS Code Run button.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "collision_data"
+DEFAULT_FILE = DATA_DIR / "events.txt"
 
 # Slot index 0 is "particle 3", because particles 1 and 2 are the incoming beam
 # protons and are not written to the file.

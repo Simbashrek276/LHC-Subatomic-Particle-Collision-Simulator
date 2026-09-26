@@ -1,4 +1,4 @@
-# LHC Subatomic Particle Collision Simulator
+# LHC Simplified Particle Collision Simulator
 
 A small Monte Carlo simulation of proton–proton collisions at the Large Hadron
 Collider (LHC), written in Python. It "collides" two protons over and over,
@@ -11,9 +11,8 @@ before**. It starts from the physics ideas, then shows how each idea turns into
 code, and finally how to run everything.
 
 The simulation now works in **full 3D**. Earlier versions kept everything in a
-flat plane to make the maths easier, and you will still see that history in the
-`legacy/` folder. Wherever the move from 2D to 3D changed something important,
-this README says so.
+flat plane to make the maths easier, so wherever that move changed something
+important, this README says so.
 
 ![Energy of each particle in the 2 to 4 channel. Four outline curves share one
 set of axes, with a ratio panel underneath.](plots/energy_steps_4particles.png)
@@ -304,14 +303,15 @@ the **analysis** layer reads them back and plots them. They meet at one file,
 `events.txt`, and are otherwise independent.
 
 ```
-simulation.py ──writes──► events.txt ──read by──► event_data.py ──► step_plot.py ──► plots/
+                                    ┌────────────── analysis_tools/ ──────────────┐
+simulation.py ──writes──► collision_data/events.txt ──► event_data.py ──► step_plot.py ──► plots/
 ```
 
 ### 2.1 The simulation layer
 
 | File | Plays the role of | Responsible for |
 |------|-------------------|-----------------|
-| `kinematics.py` | the **physicist** | the physics: four-vectors, two-body splits, boosts, invariant mass (sections 1.4–1.8). Deals only in numbers, never particle names. |
+| `utilities/kinematics.py` | the **physicist** | the physics: four-vectors, two-body splits, boosts, invariant mass (sections 1.4–1.8). Deals only in numbers, never particle names. |
 | `simulation.py` | the **director** | running the experiment: choosing final states, applying detector cuts, writing the output (sections 1.2, 1.3, 1.9). |
 
 **`kinematics.py`** is organised in five numbered sections, in reading order:
@@ -361,12 +361,17 @@ numbers, which keeps the physics reusable and testable on its own.
 | `graph_angle_steps.py` | θ, φ, and cos θ of every particle. |
 | `graph_mass_steps.py` | Single-particle and pair invariant masses. |
 
-`event_data.py` exists because of a lesson we learned the hard way. The older
-scripts in `legacy/` each carried their own copy of the file parser with a
-**column number** hard-coded into it. When the output gained `Phi` and `p_y`,
-those numbers silently pointed at the wrong columns. Nothing crashed; the plots
-just quietly became wrong. Reading the file in one place, and naming columns
-instead of numbering them, is what stops that happening again.
+`event_data.py` exists because of a lesson we learned the hard way. The graphing
+scripts we used before the 3D move each carried their own copy of the file parser
+with a **column number** hard-coded into it. When the output gained `Phi` and
+`p_y`, those numbers silently pointed at the wrong columns. Nothing crashed; the
+plots just quietly became wrong. Reading the file in one place, and naming
+columns instead of numbering them, is what stops that happening again.
+
+Everything in `analysis_tools/` works out its paths from its own location rather
+than from the working directory, so the scripts behave identically whether you
+run them from the project root, from inside `analysis_tools/`, or from the VS
+Code Run button. Figures always land in `plots/` at the project root.
 
 `step_plot.py` is a library, not a script. Running it directly does nothing at
 all — it only acts when one of the three `graph_*` scripts imports it.
@@ -374,8 +379,8 @@ all — it only acts when one of the three `graph_*` scripts imports it.
 ### 2.3 The data flow, end to end
 
 ```
- simulation.py                                   kinematics.py
- ─────────────                                   ─────────────
+ simulation.py                          utilities/kinematics.py
+ ─────────────                          ───────────────────────
  choose_final_state()
    → ["photon","photon","proton","proton"]   (just names, no physics yet)
         │
@@ -390,7 +395,7 @@ all — it only acts when one of the three `graph_*` scripts imports it.
         │
    is_conserved? ✓   passes_cuts? ✓
         │
-   write_event()  →  append to events.txt
+   write_event()  →  append to collision_data/events.txt
         │
    repeat until 100,000 events are logged
 ```
@@ -419,7 +424,7 @@ The repository ships a virtual environment in `.venv/`. Note that it uses a
 Or call it directly without activating:
 
 ```powershell
-.\.venv\bin\python.exe graph_energy_steps.py
+.\.venv\bin\python.exe analysis_tools\graph_energy_steps.py
 ```
 
 If you are setting up fresh instead:
@@ -435,11 +440,11 @@ found.
 
 ### 3.2 Run the analysis
 
-**`events.txt` already contains 100,000 events**, so you can go straight to the
-plots without generating anything. Start here:
+**`collision_data/events.txt` already contains 100,000 events**, so you can go
+straight to the plots without generating anything. Start here:
 
 ```powershell
-python event_data.py            # ~2s — prints a summary, writes nothing
+python analysis_tools\event_data.py       # ~2s — prints a summary, writes nothing
 ```
 
 It prints each channel followed by a line per particle slot:
@@ -459,14 +464,14 @@ That is a good first check. If the three event counts look right, the file parse
 cleanly and the rest will work. Then run any or all of:
 
 ```powershell
-python graph_energy_steps.py    # ~3s
-python graph_angle_steps.py     # ~4s
-python graph_mass_steps.py      # ~4s
+python analysis_tools\graph_energy_steps.py    # ~3s
+python analysis_tools\graph_angle_steps.py     # ~4s
+python analysis_tools\graph_mass_steps.py      # ~4s
 ```
 
 Each writes PNGs into `plots/` and prints a table of the same numbers it drew, so
 the values are available without opening an image. The three are independent and
-can be run in any order.
+can be run in any order, from any working directory.
 
 ### 3.3 Re-run the simulation
 
@@ -476,7 +481,7 @@ Only needed if you have changed the physics:
 python simulation.py            # ~5s
 ```
 
-> **Careful.** This opens `events.txt` in write mode and **overwrites it without
+> **Careful.** This opens `collision_data/events.txt` in write mode and **overwrites it without
 > asking**. Copy the file first if you want to compare before and after. It is
 > also tracked in git at 48 MB, so re-running puts a very large diff in your
 > working tree.
@@ -491,13 +496,13 @@ You can change the behaviour from the settings at the top of `simulation.py`:
 | `TARGET_LOGGED_EVENTS` | `100000` | How many accepted events to collect |
 | `MIN_ENERGY` | `0.00` | Energy cut (currently disabled) |
 | `VISIBLE_THETA_DEG` | `(0, 180)` | Polar angle window (currently accepts everything) |
-| `OUTPUT_FILE` | `"events.txt"` | Where to write |
+| `OUTPUT_FILE` | `collision_data/events.txt` | Where to write |
 
 ---
 
 ## 4. The output file explained
 
-`events.txt` holds one block per accepted event:
+`collision_data/events.txt` holds one block per accepted event:
 
 ```
 ___EVENT_ID: 1___
@@ -522,7 +527,8 @@ You can sanity-check any event by hand. The energies add up to 13.6, and the
 > **The row layout changed when we moved to 3D.** It used to be
 > `name, Energy, Angle(rad), p_x, p_z` — five columns with the angle in radians.
 > It is now seven columns with both angles in degrees. Anything written against
-> the old layout needs updating; see `legacy/README.md`.
+> the old five-column layout needs updating before it will read this file
+> correctly.
 
 One practical consequence worth knowing: values are written with **six decimal
 places**. At 13.6 TeV that rounding works out to a few GeV of uncertainty once it
@@ -629,47 +635,52 @@ These are honest caveats rather than bugs that break the run.
 
 6. **The detector cuts are switched off.** See section 1.9.
 
-7. **`events.txt` is 48 MB and tracked in git.** Convenient, since the plots can
+7. **`collision_data/events.txt` is 48 MB and tracked in git.** Convenient, since the plots can
    be reproduced without re-running anything, but it makes the repository heavy.
 
 ---
 
 ## 8. Project structure
 
+The project splits cleanly in two. The simulation lives at the top level, the
+analysis lives in `analysis_tools/`, and the data file they share sits between
+them in `collision_data/`. Neither half imports the other.
+
 ```
 LHC Simulation/
-├── kinematics.py               the physics engine
 ├── simulation.py               the experiment — run this to regenerate events
 │
-├── event_data.py               reads events.txt into tidy arrays
-├── step_plot.py                outline-histogram drawing (a library, not a script)
-├── graph_energy_steps.py       ┐
-├── graph_angle_steps.py        ├─ the three analysis scripts
-├── graph_mass_steps.py         ┘
+├── utilities/
+│   └── kinematics.py           the physics engine
 │
-├── events.txt                  100,000 simulated events (the current dataset)
-├── no_higgs_events.txt         an older, smaller dataset in the old 2D format
+├── analysis_tools/
+│   ├── event_data.py           reads events.txt into tidy arrays
+│   ├── step_plot.py            outline-histogram drawing (a library, not a script)
+│   ├── graph_energy_steps.py   ┐
+│   ├── graph_angle_steps.py    ├─ the three analysis scripts
+│   └── graph_mass_steps.py     ┘
 │
-├── plots/                      20 current figures
-└── legacy/                     pre-3D scripts and figures, kept for reference
-    ├── README.md               per-file status — read this before running any
-    └── plots/                  the old 2D figures
+├── collision_data/
+│   └── events.txt              100,000 simulated events (the current dataset)
+│
+└── plots/                      the 20 figures the analysis scripts produce
 ```
+
+Every script works out these paths from its own location rather than from the
+working directory, so they behave the same wherever you launch them from.
 
 ### What each file does
 
 | File | What it is |
 |------|------------|
-| `kinematics.py` | The physics engine: four-vectors, two-body decays, Lorentz boosts, invariant mass. Knows nothing about particle names. |
-| `simulation.py` | Runs the experiment: chooses final states, applies detector cuts, writes `events.txt`. |
-| `event_data.py` | Parses `events.txt` and groups events by channel. Run it on its own for a quick summary of the dataset. |
-| `step_plot.py` | Turns bin counts into outline curves and lays out the figure, including the ratio panel. Imported by the three scripts below. |
-| `graph_energy_steps.py` | Energy of each particle, one figure per channel. |
-| `graph_angle_steps.py` | θ, φ, and cos θ of each particle, per channel. |
-| `graph_mass_steps.py` | Single-particle mass, pair invariant masses, and the diphoton mass. |
-| `events.txt` | The current dataset: 100,000 events in the 3D seven-column format. |
-| `no_higgs_events.txt` | An older 110-event dataset in the old 2D five-column format, kept because one legacy script still reads it. |
-| `legacy/` | The graphing scripts from before the 3D move. Some still work and some quietly do not — `legacy/README.md` says which is which. |
+| `utilities/kinematics.py` | The physics engine: four-vectors, two-body decays, Lorentz boosts, invariant mass. Knows nothing about particle names. |
+| `simulation.py` | Runs the experiment: chooses final states, applies detector cuts, writes `collision_data/events.txt`. |
+| `analysis_tools/event_data.py` | Parses `events.txt` and groups events by channel. Run it on its own for a quick summary of the dataset. |
+| `analysis_tools/step_plot.py` | Turns bin counts into outline curves and lays out the figure, including the ratio panel. Imported by the three scripts below, and does nothing if you run it directly. |
+| `analysis_tools/graph_energy_steps.py` | Energy of each particle, one figure per channel. |
+| `analysis_tools/graph_angle_steps.py` | θ, φ, and cos θ of each particle, per channel. |
+| `analysis_tools/graph_mass_steps.py` | Single-particle mass, pair invariant masses, and the diphoton mass. |
+| `collision_data/events.txt` | The current dataset: 100,000 events in the 3D seven-column format. |
 
 ---
 
